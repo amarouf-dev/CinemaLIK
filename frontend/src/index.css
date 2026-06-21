@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cinema-bg: #0B0B0D;
+  --color-cinema-surface: #17140F;
+  --color-cinema-surface-2: #1F1B14;
+  --color-cinema-orange: #FF5A1F;
+  --color-cinema-orange-bright: #FF7A3D;
+  --color-cinema-cream: #F5F1E8;
+  --color-cinema-muted: #8A8378;
+  --color-cinema-line: #332B22;
+
+  --font-marquee: 'Bebas Neue', sans-serif;
+  --font-card-body: 'Archivo', sans-serif;
+}
+
+.marquee
+{
+     font-family: 'Bebas Neue', sans-serif;
+     letter-spacing: 0.04em;
+}
+
+.card-body
+{
+     font-family: 'Archivo', sans-serif;
+}
+
+.card-input
+{
+     background:#1F1B14;
+     border:1px solid #332B22;
+     color:#F5F1E8;
+}
+
+.card-input::placeholder
+{
+     color:#8A8378;
+}
+
+.card-input:focus
+{
+     border-color:#FF5A1F;
+     box-shadow:0 0 0 3px rgba(255,90,31,0.15);
+     outline:none;
+}
+
+.card-bulb
+{
+     background: radial-gradient(circle, #FF7A3D 0%, #FF5A1F 60%, transparent 70%);
+}
+
+.card-ticket-edge
+{
+     background-image: radial-gradient(circle, #0B0B0D 5px, transparent 5.5px);
+     background-size: 16px 16px;
+     background-position: center;
+}
