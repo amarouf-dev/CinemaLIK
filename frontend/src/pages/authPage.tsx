@@ -4,7 +4,7 @@ import  Login from '../components/login'
 import Register  from '../components/register'
 
 function Auth() {
-    const [changeForm, setChangeForm] = useState(true);
+    const [changeForm, setChangeForm] = useState(false);
 
      return (
     <main className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-cinema-bg">
@@ -29,8 +29,6 @@ function Auth() {
               Admit one. Enter your details to claim your seat.
             </p>
           </div>
- 
-          {/* notch to sell the ticket-stub look */}
           { 
             changeForm ? <Register setChangeForm={setChangeForm} /> : <Login setChangeForm={setChangeForm}/>
           }

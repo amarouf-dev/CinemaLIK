@@ -38,4 +38,15 @@ export class UsersService {
       data: { refresh_token: hashedToken },
     });
   }
+
+  // get user's data
+  async getUserData(id: number) {
+    return await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        email: true,
+        name: true,
+      },
+    });
+  }
 }

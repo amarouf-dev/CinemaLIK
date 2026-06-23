@@ -7,11 +7,13 @@ function Login({setChangeForm})
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const HandleSubmit = async (e) => {
     e.preventDefault();
     try
     {
+      setLoading(true);
       const res = await client.post('/auth/login', {
         email,
         password,
@@ -19,8 +21,8 @@ function Login({setChangeForm})
     )
     const accessToken = res.data.accessToken;
     localStorage.setItem('accessToken', accessToken);
+    setLoading(false);
     navigate('/home');
-    console.log('this reached');
     } catch(error)
     {
       console.log(error);
@@ -61,30 +63,34 @@ function Login({setChangeForm})
             </div>
  
             <div className="flex items-center justify-between text-xs">
-              <label className="flex items-center gap-2 cursor-pointer text-cinema-muted">
+              
+              {/* keep me signed in logic */}
+
+              {/* <label className="flex items-center gap-2 cursor-pointer text-cinema-muted">
                 <input
                   type="checkbox"
                   defaultChecked
+                  checked={isChecked}
                   className="w-3.5 h-3.5 accent-cinema-orange"
                 />
                 Keep me signed in
-              </label>
+              </label> */}
               <a href="#" className="hover:opacity-80 text-cinema-orange">
                 Forgot password?
               </a>
             </div>
- 
+            
             <button
               type="submit"
               className="w-full marquee text-xl tracking-wide py-3.5 rounded-lg transition-colors bg-cinema-orange text-white hover:bg-cinema-orange-bright"
             >
-              LOGIN
+              {loading ? "Loading ..." : "LOGIN"}
             </button>
 
             <div className="p-4">
                 <p className="text-center text-xs pt-1 text-cinema-muted">
                     You don't have an account?{" "}
-                    <a onClick={() => setChangeForm(true)} href="#" className="hover:opacity-80 text-cinema-orange">
+                    <a onClick={() => setChangeForm(true)} className="hover:opacity-80 text-cinema-orange">
                         register
                     </a>
                 </p>

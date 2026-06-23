@@ -1,5 +1,6 @@
 import { useState } from "react";
 import client from '../api/client'
+import { useNavigate } from "react-router-dom";
 
 function Register({setChangeForm})
 {
@@ -7,17 +8,25 @@ function Register({setChangeForm})
   const [password, setPassword] = useState('');
   const [confpassword, setconfPassword] = useState('');
   const [name, setName] = useState('');
+  const navigate = useNavigate();  
+  const [loading, setLoading] = useState(false);
 
-  const HandleSubmit = async () => {
-    console.log('hello world');
+
+  const HandleSubmit = async (e) => {
+    e.preventDefault();
     try
     {
-      const res = await client.post('/auth/register', {
-        name,
-        email,
-        password,
-      }
+        setLoading(true);
+        const res = await client.post('/auth/register', {
+          name,
+          email,
+          password,
+        }
       )
+      const accessToken = res.data.accessToken;
+      localStorage.setItem('accessToken', accessToken);
+      setLoading(false);
+      navigate('/home');
     } catch(error)
     {
       console.log(error);
@@ -109,7 +118,7 @@ function Register({setChangeForm})
            <div className="p-2">
                 <p className="text-center text-xs pt-1 text-cinema-muted">
                     Already have an account?{" "}
-                    <a onClick={() => setChangeForm(false)} href="#" className="hover:opacity-80 text-cinema-orange">
+                    <a onClick={() => setChangeForm(false)} className="hover:opacity-80 text-cinema-orange">
                         Log in
                     </a>
                 </p>
