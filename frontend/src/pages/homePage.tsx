@@ -1,60 +1,104 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import movieCollage from "../assets/movie-collage.jpeg";
+import client from '../api/client'
+import { useNavigate } from "react-router-dom";
 
-const NOW_SHOWING = [
-  { id: 1, title: "Midnight Reel", genre: "Thriller", rating: "8.2", duration: "2h 04m", color: "#7C2D12" },
-  { id: 2, title: "Last Frame", genre: "Drama", rating: "7.6", duration: "1h 52m", color: "#1E3A5F" },
-  { id: 3, title: "Static Horizon", genre: "Sci-Fi", rating: "8.7", duration: "2h 18m", color: "#3B2F5E" },
-  { id: 4, title: "Velvet Hour", genre: "Romance", rating: "7.1", duration: "1h 45m", color: "#5C1A2E" },
-  { id: 5, title: "Concrete Sky", genre: "Action", rating: "8.0", duration: "2h 10m", color: "#2C2C2C" },
-  { id: 6, title: "Paper Moonlight", genre: "Comedy", rating: "7.4", duration: "1h 38m", color: "#1F3A2E" },
-  { id: 7, title: "Glass Echo", genre: "Mystery", rating: "8.4", duration: "2h 02m", color: "#3A2A1A" },
-  { id: 8, title: "Slow Static", genre: "Drama", rating: "7.9", duration: "1h 58m", color: "#1A2A3A" },
-];
+interface TmdbMovie {
+  id: number;
+  title: string;
+  overview: string;
+  poster: string | null;
+  rating: number;
+}
+
+function StarRating({ rating }) {
+  const pct = Math.round((rating / 10) * 100);
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="relative text-base leading-none" style={{ color: "#332B22" }}>
+        {"★★★★★"}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: `${pct}%`, color: "#FF5A1F" }}>
+          {"★★★★★"}
+        </div>
+      </div>
+      <span className="card-body text-xs text-cinema-muted">{rating.toFixed(1)}</span>
+    </div>
+  );
+}
 
 function MovieCard({ movie }) {
+  const navigate = useNavigate();
   return (
     <div className="group cursor-pointer">
-      <div
-        className="relative aspect-[2/3] rounded-lg overflow-hidden border border-cinema-line"
-        style={{ background: movie.color }}
-      >
-        <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
-          <span className="marquee text-2xl tracking-wide text-cinema-cream/90">
-            {movie.title}
-          </span>
+      <div className="relative aspect-2/3 rounded-lg overflow-hidden border border-cinema-line bg-cinema-surface">
+
+        {/* Poster image — replace null with real poster URL from your API */}
+        {movie.poster ? (
+          <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center p-4 text-center bg-cinema-surface-2">
+            <span className="marquee text-xl tracking-wide text-cinema-cream/60">{movie.title}</span>
+          </div>
+        )}
+
+        {/* Rating badge */}
+        <div className="absolute top-2 right-2 bg-cinema-bg/90 backdrop-blur-sm rounded px-2 py-0.5 text-xs font-semibold text-cinema-orange border border-cinema-orange/40">
+          ★ {movie.rating.toFixed(1)}
         </div>
-        <div className="absolute top-2 right-2 bg-cinema-bg/80 backdrop-blur-sm rounded px-2 py-0.5 text-xs font-semibold text-cinema-orange border border-cinema-orange/40">
-          ★ {movie.rating}
-        </div>
-        <div className="absolute inset-0 bg-cinema-bg/0 group-hover:bg-cinema-bg/40 transition-colors flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
-          <button className="card-body text-xs uppercase tracking-widest bg-cinema-orange text-cinema-bg px-4 py-2 rounded-md font-semibold">
+
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-cinema-bg/95 via-cinema-bg/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4 gap-3">
+          <p className="card-body text-xs text-cinema-cream/80 line-clamp-3 leading-relaxed">
+            {movie.overview}
+          </p>
+          <button
+          onClick={() => navigate(`/home/booking/${movie.id}`)}
+          className="card-body text-xs uppercase tracking-widest bg-cinema-orange text-cinema-bg px-4 py-2 rounded-md font-semibold w-full">
             Book Now
           </button>
         </div>
       </div>
-      <div className="mt-2.5 px-0.5">
+
+      <div className="mt-2.5 px-0.5 space-y-1">
         <p className="card-body text-sm font-semibold text-cinema-cream truncate">{movie.title}</p>
-        <p className="card-body text-xs text-cinema-muted mt-0.5">{movie.genre} · {movie.duration}</p>
+        <StarRating rating={movie.rating} />
       </div>
     </div>
   );
 }
 
 export default function Home() {
-  const [filter, setFilter] = useState("All");
-  const genres = ["All", "Action", "Drama", "Sci-Fi", "Comedy", "Thriller", "Romance", "Mystery"];
-  const filtered = filter === "All" ? NOW_SHOWING : NOW_SHOWING.filter((m) => m.genre === filter);
+
+  const [Page, setPage] = useState(1);
+  const [Movies, setMovies] = useState<TmdbMovie[]>([]);
+  useEffect(() => {
+    async function fetchMovies()
+    {
+      try
+      {
+        const movies = await client.get('/movies/popular', {
+          params: {page: Page},
+          }
+        );
+        setMovies(movies.data);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+    fetchMovies();
+  }, [Page])
 
   return (
     <main className="min-h-screen bg-cinema-bg card-body">
+
       {/* Hero */}
       <section
-        className="relative h-[60vh] min-h-[420px] flex items-center justify-center bg-cover bg-center"
-        style={{ backgroundImage:"url('src/assets/movie-collage.jpeg')"  }}
+        className="relative h-[50vh] min-h-60 flex items-center justify-center bg-cover bg-center"
+        style={{ backgroundImage: `url(${movieCollage})` }}
+        id="hero"
       >
-        {/* dark overlay */}
         <div className="absolute inset-0 bg-cinema-bg/80" />
-        <div className="absolute inset-0 bg-gradient-to-t from-cinema-bg via-cinema-bg/40 to-cinema-bg/70" />
+        <div className="absolute inset-0 bg-linear-to-t from-cinema-bg via-cinema-bg/40 to-cinema-bg/70" />
 
         <div className="relative z-10 text-center px-4">
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -65,52 +109,38 @@ export default function Home() {
             <span className="card-bulb w-2.5 h-2.5 rounded-full" />
           </div>
           <p className="text-cinema-muted text-sm sm:text-base max-w-md mx-auto mb-7">
-            Every story deserves the big screen. Book your seat for tonight's show.
+            Book your seat for tonight's show.
           </p>
-          <button className="marquee text-xl tracking-wide bg-cinema-orange text-cinema-bg px-8 py-3 rounded-lg hover:bg-cinema-orange-bright transition-colors">
+          {/* <button className="marquee text-xl tracking-wide bg-cinema-orange text-cinema-bg px-8 py-3 rounded-lg hover:bg-cinema-orange-bright transition-colors">
             SEE WHAT'S PLAYING
-          </button>
+          </button> */}
         </div>
       </section>
 
       {/* Now Showing */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-7">
-          <div>
-            <p className="marquee text-3xl tracking-wide text-cinema-orange">NOW SHOWING</p>
-            <p className="text-cinema-muted text-sm mt-1">Tonight's lineup, fresh off the reel.</p>
-          </div>
-
-          {/* genre filter */}
-          <div className="flex flex-wrap gap-2">
-            {genres.map((g) => (
-              <button
-                key={g}
-                onClick={() => setFilter(g)}
-                className={`text-xs uppercase tracking-widest px-3 py-1.5 rounded-full border transition-colors ${
-                  filter === g
-                    ? "bg-cinema-orange text-cinema-bg border-cinema-orange"
-                    : "border-cinema-line text-cinema-muted hover:border-cinema-orange hover:text-cinema-orange"
-                }`}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
+      <section id="Now Showing" className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+        <div className="mb-7">
+          <p className="marquee text-3xl tracking-wide text-cinema-orange">NOW SHOWING</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-6">
-          {filtered.map((movie) => (
+        {/* Movie grid — replace MOVIES with your real data from the API */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 sm:gap-6">
+          {Movies.map((movie) => (
             <MovieCard key={movie.id} movie={movie} />
           ))}
         </div>
 
-        {filtered.length === 0 && (
-          <p className="text-center text-cinema-muted text-sm py-12">
-            No films showing in this genre right now.
-          </p>
-        )}
+        {/* Load More button — wire onClick to fetch the next page */}
+        <div className="flex justify-center mt-10">
+          <a
+            href="#Now Showing"
+          onClick={() => setPage(Page + 1)}
+          className="marquee text-xl tracking-wide px-10 py-3 rounded-lg border border-cinema-orange text-cinema-orange hover:bg-cinema-orange hover:text-cinema-bg transition-colors cursor-pointer">
+            LOAD MORE
+          </a>
+        </div>
       </section>
+
     </main>
   );
 }
