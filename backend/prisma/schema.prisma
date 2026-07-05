@@ -13,10 +13,31 @@ datasource db {
   provider = "postgresql"
 }
 
+model Seat {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int
+  row        String
+  number     Int
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+}
+
+model Booking {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  movieId    Int
+  date       DateTime
+  time       String
+  createdAt  DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id])
+  seats       Seat[]
+  @@index([movieId, date, time])
+}
+
 model User {
   id    Int     @id @default(autoincrement())
   email String  @unique
   name  String?  @default("Unknown")
   password_hash  String
   refresh_token  String?
+  bookings       Booking[]
 }

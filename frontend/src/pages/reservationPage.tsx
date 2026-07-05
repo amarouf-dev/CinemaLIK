@@ -1,39 +1,19 @@
-// Booking.jsx — pure UI, no logic
-// TODO: replace all placeholder values with real data from your API / router
-
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import client from '../api/client';
 
-// ─── Placeholder data (replace with props or router state) ───────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
-const MOVIE = {
-  title: "Static Horizon",
-  genre: "Sci-Fi",
-  rating: 8.7,
-  duration: "2h 18m",
-  poster: null,
+const getNextSixDays = (startDate = new Date()) => {
+  return Array.from({ length: 6 }, (_, i) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + i + 1);
+    const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date);
+    return `${dayName} ${date.getDate()}`;
+  });
 };
 
-const DATES = ["Mon 23", "Tue 24", "Wed 25", "Thu 26", "Fri 27", "Sat 28"];
-
 const TIMES = ["10:00", "12:30", "15:15", "18:00", "20:45", "23:10"];
-
-// Seat map: "available" | "taken" — "selected" is managed by your state
-const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H"];
-const SEATS_PER_ROW = 12;
-
-// Generate a static placeholder seat map
-// Replace this with real seat data from your API
-const SEAT_MAP = ROWS.map((row) =>
-  Array.from({ length: SEATS_PER_ROW }, (_, i) => ({
-    id: `${row}${i + 1}`,
-    row,
-    number: i + 1,
-    status: Math.random() < 0.3 ? "taken" : "available", // placeholder
-  }))
-);
-
 const TICKET_PRICE = 12.5;
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -71,7 +51,7 @@ function Seat({ seat, isSelected, onToggle }) {
     <button
       className={style}
       disabled={seat.status === "taken"}
-      onClick={() => onToggle(seat)} // TODO: wire to your selected seats state
+      onClick={() => onToggle(seat)}
       title={seat.id}
     >
       {seat.number}
@@ -79,21 +59,28 @@ function Seat({ seat, isSelected, onToggle }) {
   );
 }
 
-function SeatMap({ selectedSeats, onToggleSeat }) {
+function SeatMap({ seatMap, selectedSeats, onToggleSeat }) {
+  if (!seatMap || seatMap.length === 0) {
+    return (
+      <p className="text-cinema-muted text-sm text-center py-10">
+        {selectedSeats !== null ? "Select a date and time to see available seats." : "Loading seats..."}
+      </p>
+    );
+  }
+
+  const SEATS_PER_ROW = seatMap[0].length;
+
   return (
     <div className="space-y-2">
-      {/* Screen indicator */}
       <div className="mb-6 text-center">
         <div className="h-1 rounded-full bg-gradient-to-r from-transparent via-cinema-orange/60 to-transparent mx-8 mb-1" />
         <span className="text-[10px] uppercase tracking-widest text-cinema-muted card-body">Screen</span>
       </div>
 
-      {SEAT_MAP.map((row) => (
+      {seatMap.map((row) => (
         <div key={row[0].row} className="flex items-center gap-2">
-          {/* Row label */}
           <span className="marquee text-sm text-cinema-muted w-4 text-center">{row[0].row}</span>
 
-          {/* Gap in the middle (cinema aisle) */}
           <div className="flex gap-1">
             {row.slice(0, SEATS_PER_ROW / 2).map((seat) => (
               <Seat
@@ -105,7 +92,7 @@ function SeatMap({ selectedSeats, onToggleSeat }) {
             ))}
           </div>
 
-          <div className="w-4" /> {/* aisle gap */}
+          <div className="w-4" />
 
           <div className="flex gap-1">
             {row.slice(SEATS_PER_ROW / 2).map((seat) => (
@@ -125,29 +112,47 @@ function SeatMap({ selectedSeats, onToggleSeat }) {
   );
 }
 
-function OrderSummary({Movie, selectedDate, selectedTime, selectedSeats }) {
+function OrderSummary({ movie, movieLoading, selectedDate, selectedTime, selectedSeats, onConfirm }) {
   const total = selectedSeats.length * TICKET_PRICE;
-  const hours = Math.floor(Movie.duration / 60);
-  const minutes = Movie.duration % 60;
+  const hours   = movie?.duration ? Math.floor(movie.duration / 60) : null;
+  const minutes = movie?.duration ? movie.duration % 60 : null;
+  const canConfirm = selectedSeats.length > 0 && selectedDate && selectedTime;
 
   return (
     <div className="bg-cinema-surface border border-cinema-line rounded-xl p-6 space-y-5 card-body sticky top-6">
+
       {/* Movie info */}
       <div className="flex gap-4">
         <div className="w-16 shrink-0 aspect-[2/3] rounded-lg bg-cinema-surface-2 border border-cinema-line flex items-center justify-center overflow-hidden">
-          {Movie.poster ? (
-            <img src={Movie.poster} alt={Movie.title} className="w-full h-full object-cover" />
+          {movieLoading ? (
+            <div className="w-full h-full animate-pulse bg-cinema-line" />
+          ) : movie?.poster ? (
+            <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
           ) : (
-            <span className="marquee text-xs text-cinema-cream/40 text-center px-1">{Movie.title}</span>
+            <span className="marquee text-xs text-cinema-cream/40 text-center px-1">{movie?.title}</span>
           )}
         </div>
-        <div>
-          <p className="marquee text-xl tracking-wide text-cinema-cream">{Movie.title}</p>
-          <p className="text-xs text-cinema-muted mt-1">{Movie.genres?.join(" | ")} · {hours}h {minutes}m</p>
-          <div className="flex items-center gap-1 mt-1.5">
-            <span className="text-cinema-orange text-xs">★</span>
-            <span className="text-xs text-cinema-muted">{Movie.rating}</span>
-          </div>
+
+        <div className="flex-1 min-w-0">
+          {movieLoading ? (
+            <div className="space-y-2 animate-pulse">
+              <div className="h-4 bg-cinema-line rounded w-3/4" />
+              <div className="h-3 bg-cinema-line rounded w-1/2" />
+              <div className="h-3 bg-cinema-line rounded w-1/4" />
+            </div>
+          ) : (
+            <>
+              <p className="marquee text-xl tracking-wide text-cinema-cream truncate">{movie?.title}</p>
+              <p className="text-xs text-cinema-muted mt-1">
+                {movie?.genres?.join(" | ")}
+                {hours !== null ? ` · ${hours}h ${minutes}m` : ""}
+              </p>
+              <div className="flex items-center gap-1 mt-1.5">
+                <span className="text-cinema-orange text-xs">★</span>
+                <span className="text-xs text-cinema-muted">{movie?.rating}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -165,7 +170,7 @@ function OrderSummary({Movie, selectedDate, selectedTime, selectedSeats }) {
         </div>
         <div className="flex justify-between">
           <span className="text-cinema-muted">Seats</span>
-          <span className="text-cinema-cream">
+          <span className="text-cinema-cream text-right max-w-[60%] truncate">
             {selectedSeats.length > 0 ? selectedSeats.join(", ") : "—"}
           </span>
         </div>
@@ -185,16 +190,20 @@ function OrderSummary({Movie, selectedDate, selectedTime, selectedSeats }) {
         </div>
       </div>
 
-      {/* Confirm button — TODO: wire onClick to your booking submit handler */}
       <button
-        disabled={selectedSeats.length === 0 || !selectedDate || !selectedTime}
+        disabled={!canConfirm}
+        onClick={onConfirm}
         className="w-full marquee text-xl tracking-wide py-3.5 rounded-lg transition-colors bg-cinema-orange text-cinema-bg hover:bg-cinema-orange-bright disabled:opacity-40 disabled:cursor-not-allowed"
       >
         CONFIRM BOOKING
       </button>
 
-      {selectedSeats.length === 0 && (
-        <p className="text-center text-xs text-cinema-muted">Select at least one seat to continue.</p>
+      {!canConfirm && (
+        <p className="text-center text-xs text-cinema-muted">
+          {!selectedDate || !selectedTime
+            ? "Select a date and time to continue."
+            : "Select at least one seat to continue."}
+        </p>
       )}
     </div>
   );
@@ -203,42 +212,81 @@ function OrderSummary({Movie, selectedDate, selectedTime, selectedSeats }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Booking() {
-  const { id } = useParams();
-  const [Movie, setMovie] = useState({});
-  // TODO: move these to useState and wire the pickers + seat map
-  const selectedDate  = "Wed 25";   // replace with state
-  const selectedTime  = "20:45";    // replace with state
-  const selectedSeats = ["C5", "C6"]; // replace with state
+  const { id }     = useParams();
+  const navigate   = useNavigate();
 
+  // ── State ──
+  const [movie, setMovie]               = useState(null);
+  const [movieLoading, setMovieLoading] = useState(true);
+
+  const [selectedDate,  setSelectedDate]  = useState(null);
+  const [selectedTime,  setSelectedTime]  = useState(null);
+  const [selectedSeats, setSelectedSeats] = useState([]);
+
+  const [seatMap, setSeatMap]           = useState([]);
+  const [seatMapLoading, setSeatMapLoading] = useState(false);
+
+  // ── Fetch movie ──
   useEffect(() => {
-    async function fetchMovie() {
-      try
-      {
-        const res = await client.get(`/movies/${id}`);
-        setMovie(res.data);
-      } catch (error)
-      {
-        console.log(error);
-      }
-    }
-    fetchMovie();
-  }, [id])
+    client
+      .get(`/movies/${id}`)
+      .then(({ data }) => setMovie(data))
+      .catch((err) => console.error(err))
+      .finally(() => setMovieLoading(false));
+  }, [id]);
 
-  // TODO: implement this — add/remove seat.id from selectedSeats state
-  function handleToggleSeat(seat) {}
+  // ── Fetch seat map when date + time are both selected ──
+  // TODO: replace with your real endpoint — e.g. /movies/:id/seats?date=...&time=...
+  useEffect(() => {
+    if (!selectedDate || !selectedTime) return;
+
+    setSeatMapLoading(true);
+    setSelectedSeats([]); // clear seat selection when showtime changes
+
+    client
+      .get(`/movies/${id}/seats`, { params: { date: selectedDate, time: selectedTime } })
+      .then(({ data }) => setSeatMap(data))
+      .catch((err) => console.error(err))
+      .finally(() => setSeatMapLoading(false));
+  }, [id, selectedDate, selectedTime]);
+
+  // ── Toggle a seat on/off ──
+  function handleToggleSeat(seat) {
+    setSelectedSeats((prev) =>
+      prev.includes(seat.id)
+        ? prev.filter((s) => s !== seat.id)
+        : [...prev, seat.id]
+    );
+  }
+
+  // ── Confirm booking ──
+  // TODO: navigate to confirmation page after successful POST
+  function handleConfirm() {
+    client
+      .post('/bookings', {
+        movieId:  id,
+        date:     selectedDate,
+        time:     selectedTime,
+        seats:    selectedSeats,
+      })
+      .then(({ data }) => navigate(`/confirmation/${data.id}`))
+      .catch((err) => console.error(err));
+  }
 
   return (
     <main className="min-h-screen bg-cinema-bg card-body pb-16">
 
       {/* Top bar */}
       <div className="border-b border-cinema-line px-4 sm:px-8 py-4 flex items-center gap-4">
-        {/* TODO: wire to router navigate(-1) or Link to home */}
-        <button className="text-cinema-muted hover:text-cinema-orange transition-colors text-sm">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-cinema-muted hover:text-cinema-orange transition-colors text-sm"
+        >
           ← Back
         </button>
         <span className="text-cinema-line">|</span>
         <p className="marquee text-xl text-cinema-cream tracking-wide">
-          BOOK · <span className="text-cinema-orange">{MOVIE.title}</span>
+          BOOK · <span className="text-cinema-orange">{movie?.title ?? "..."}</span>
         </p>
       </div>
 
@@ -251,10 +299,10 @@ export default function Booking() {
           <div>
             <p className="text-xs uppercase tracking-widest text-cinema-muted mb-3">Select date</p>
             <div className="flex gap-2 flex-wrap">
-              {DATES.map((date) => (
+              {getNextSixDays().map((date) => (
                 <button
                   key={date}
-                  // TODO: onClick={() => setSelectedDate(date)}
+                  onClick={() => setSelectedDate(date)}
                   className={`px-4 py-2 rounded-lg text-sm border transition-colors ${
                     selectedDate === date
                       ? "bg-cinema-orange text-cinema-bg border-cinema-orange marquee tracking-wide"
@@ -274,7 +322,7 @@ export default function Booking() {
               {TIMES.map((time) => (
                 <button
                   key={time}
-                  // TODO: onClick={() => setSelectedTime(time)}
+                  onClick={() => setSelectedTime(time)}
                   className={`px-4 py-2 rounded-lg text-sm border transition-colors ${
                     selectedTime === time
                       ? "bg-cinema-orange text-cinema-bg border-cinema-orange marquee tracking-wide"
@@ -294,7 +342,17 @@ export default function Booking() {
               <SeatLegend />
             </div>
             <div className="overflow-x-auto pb-2">
-              <SeatMap selectedSeats={selectedSeats} onToggleSeat={handleToggleSeat} />
+              {seatMapLoading ? (
+                <p className="text-cinema-muted text-sm text-center py-10 animate-pulse">
+                  Loading seats...
+                </p>
+              ) : (
+                <SeatMap
+                  seatMap={seatMap}
+                  selectedSeats={selectedSeats}
+                  onToggleSeat={handleToggleSeat}
+                />
+              )}
             </div>
           </div>
 
@@ -303,10 +361,12 @@ export default function Booking() {
         {/* Right — order summary */}
         <div className="w-full lg:w-80 shrink-0">
           <OrderSummary
-            Movie={Movie}
+            movie={movie}
+            movieLoading={movieLoading}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             selectedSeats={selectedSeats}
+            onConfirm={handleConfirm}
           />
         </div>
 
