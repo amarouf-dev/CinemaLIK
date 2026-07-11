@@ -6,16 +6,19 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ConfigModule } from '@nestjs/config';
 import { MoviesModule } from './movies/movies.module';
+import { BookingModule } from './booking/booking.module';
 
 @Module({
   imports: [
     AuthModule,
     UsersModule,
     MoviesModule,
+    BookingModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env', // Default, but explicit is clearer
     }),
+    BookingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
