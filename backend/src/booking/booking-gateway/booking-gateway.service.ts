@@ -2,8 +2,10 @@ import {
   WebSocketGateway,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { MessageBody, SubscribeMessage } from '@nestjs/websockets';
+import { Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
@@ -21,9 +23,18 @@ export class BookingGateway
     console.log('Client disconnected');
   }
 
-  @SubscribeMessage('hello')
-  handleHello(@MessageBody() body: string) {
-    console.log('here');
-    console.log(body);
+  @SubscribeMessage('join-room')
+  async handleHello(
+    @MessageBody() room: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    await client.join(room);
+
+    console.log(`client <${client.id}> joined room ${room}`);
+
+    return {
+      event: 'helloback',
+      data: 'hello react !',
+    };
   }
 }

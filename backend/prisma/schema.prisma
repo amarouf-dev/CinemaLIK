@@ -13,31 +13,73 @@ datasource db {
   provider = "postgresql"
 }
 
-model Seat {
-  id         Int      @id @default(autoincrement())
-  bookingId  Int
-  row        String
-  number     Int
-  booking    Booking  @relation(fields: [bookingId], references: [id])
+model User {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  name           String?
+  passwordHash   String
+  refreshToken   String?
+
+  bookings       Booking[]
 }
 
-model Booking {
-  id         Int       @id @default(autoincrement())
-  userId     Int
-  movieId    Int
-  date       DateTime
-  time       String
-  createdAt  DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id])
-  seats       Seat[]
+model Showing {
+  id             Int       @id @default(autoincrement())
+  movieId        Int
+  date           DateTime
+  time           String
+
+  seats          Seat[]
+  bookings       Booking[]
+
   @@index([movieId, date, time])
 }
 
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?  @default("Unknown")
-  password_hash  String
-  refresh_token  String?
-  bookings       Booking[]
+model Seat {
+  id             Int        @id @default(autoincrement())
+  showingId      Int
+
+  row            String
+  number         Int
+
+  status         SeatStatus @default(AVAILABLE)
+
+  heldByUserId   Int?
+  heldUntil      DateTime?
+
+  showing        Showing     @relation(fields: [showingId], references: [id])
+
+  bookingSeat    BookingSeat?
+
+  @@unique([showingId, row, number])
+}
+
+model Booking {
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  showingId      Int
+
+  createdAt      DateTime  @default(now())
+
+  user           User      @relation(fields: [userId], references: [id])
+  showing        Showing   @relation(fields: [showingId], references: [id])
+
+  seats          BookingSeat[]
+}
+
+model BookingSeat {
+  bookingId      Int
+  seatId         Int
+
+  booking        Booking @relation(fields: [bookingId], references: [id])
+  seat           Seat    @relation( fields: [seatId], references: [id])
+
+  @@id([bookingId, seatId])
+  @@unique([seatId])
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
 }

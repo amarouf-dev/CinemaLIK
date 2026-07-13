@@ -4,7 +4,7 @@ import Home from "./pages/homePage";
 import Booking from "./pages/reservationPage";
 import { socket } from './socket'
 
-socket.emit('hello', "A7san connection m3a a7san server");
+socket.emit('join-room', "showing-123");
 
 function App() {
 
