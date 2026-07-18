@@ -83,6 +83,8 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.userservice.findUserByEmail(dto.email);
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user.password_hash)
+      throw new UnauthorizedException('The user has no password');
     const result: boolean = await bcrypt.compare(
       dto.password,
       user.password_hash,

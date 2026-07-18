@@ -17,69 +17,39 @@ model User {
   id             Int       @id @default(autoincrement())
   email          String    @unique
   name           String?
-  passwordHash   String
-  refreshToken   String?
+  password_hash   String?
+  refresh_token   String?
 
   bookings       Booking[]
 }
 
 model Showing {
-  id             Int       @id @default(autoincrement())
-  movieId        Int
-  date           DateTime
-  time           String
+  id          Int      @id @default(autoincrement())
+  movieId     Int
+  date        DateTime
+  time        String
 
-  seats          Seat[]
-  bookings       Booking[]
-
-  @@index([movieId, date, time])
-}
-
-model Seat {
-  id             Int        @id @default(autoincrement())
-  showingId      Int
-
-  row            String
-  number         Int
-
-  status         SeatStatus @default(AVAILABLE)
-
-  heldByUserId   Int?
-  heldUntil      DateTime?
-
-  showing        Showing     @relation(fields: [showingId], references: [id])
-
-  bookingSeat    BookingSeat?
-
-  @@unique([showingId, row, number])
+  bookings    Booking[]
 }
 
 model Booking {
-  id             Int       @id @default(autoincrement())
-  userId         Int
-  showingId      Int
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  showingId   Int
+  createdAt   DateTime @default(now())
 
-  createdAt      DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id])
+  showing      Showing   @relation(fields: [showingId], references: [id])
 
-  user           User      @relation(fields: [userId], references: [id])
-  showing        Showing   @relation(fields: [showingId], references: [id])
-
-  seats          BookingSeat[]
+  seats        Seat[]
 }
 
-model BookingSeat {
-  bookingId      Int
-  seatId         Int
+model Seat {
+  id          Int      @id @default(autoincrement())
 
-  booking        Booking @relation(fields: [bookingId], references: [id])
-  seat           Seat    @relation( fields: [seatId], references: [id])
+  bookingId   Int
+  row         String
+  number      Int
 
-  @@id([bookingId, seatId])
-  @@unique([seatId])
-}
-
-enum SeatStatus {
-  AVAILABLE
-  HELD
-  BOOKED
+  booking     Booking  @relation(fields: [bookingId], references: [id])
 }
