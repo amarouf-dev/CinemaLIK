@@ -11,21 +11,19 @@ function Login({setChangeForm})
 
   const HandleSubmit = async (e) => {
     e.preventDefault();
-    try
-    {
+    try {
       setLoading(true);
       const res = await client.post('/auth/login', {
         email,
         password,
-      }
-    )
-    const accessToken = res.data.accessToken;
-    localStorage.setItem('accessToken', accessToken);
-    setLoading(false);
-    navigate('/home');
-    } catch(error)
-    {
+      });
+      const accessToken = res.data.accessToken;
+      localStorage.setItem('accessToken', accessToken);
+      navigate('/home');
+    } catch (error) {
       console.log(error);
+    } finally {
+      setLoading(false);
     }
   }
 

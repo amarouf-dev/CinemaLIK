@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { BookingController } from './booking.controller';
-import { BookingService } from './booking.service';
+import { ScheduleModule } from '@nestjs/schedule';
 import { BookingGateway } from './booking-gateway/booking-gateway.service';
-
+import { LockExpiryCron } from './lock-expiry.cron';
+import { PrismaService } from '../prisma/prisma.service';
+ 
 @Module({
-  controllers: [BookingController],
-  providers: [BookingService, BookingGateway],
+  imports: [ScheduleModule.forRoot()],
+  providers: [BookingGateway, LockExpiryCron, PrismaService],
 })
 export class BookingModule {}

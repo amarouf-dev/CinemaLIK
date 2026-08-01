@@ -14,22 +14,20 @@ function Register({setChangeForm})
 
   const HandleSubmit = async (e) => {
     e.preventDefault();
-    try
-    {
-        setLoading(true);
-        const res = await client.post('/auth/register', {
-          name,
-          email,
-          password,
-        }
-      )
+    try {
+      setLoading(true);
+      const res = await client.post('/auth/register', {
+        name,
+        email,
+        password,
+      });
       const accessToken = res.data.accessToken;
       localStorage.setItem('accessToken', accessToken);
-      setLoading(false);
       navigate('/home');
-    } catch(error)
-    {
+    } catch (error) {
       console.log(error);
+    } finally {
+      setLoading(false);
     }
   }
 

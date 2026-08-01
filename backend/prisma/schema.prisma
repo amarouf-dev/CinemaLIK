@@ -23,33 +23,65 @@ model User {
   bookings       Booking[]
 }
 
-model Showing {
-  id          Int      @id @default(autoincrement())
-  movieId     Int
-  date        DateTime
-  time        String
+model Movie {
+  id       Int     @id   // TMDB id
+  title    String
+  poster   String?
+  rating   Float
+  duration Int           // minutes
 
-  bookings    Booking[]
+  screenings Screening[]
+
+  @@map("movies")
 }
 
-model Booking {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  showingId   Int
-  createdAt   DateTime @default(now())
+model Screening {
+  id       String   @id @default(uuid())
+  movieId  Int
+  startsAt DateTime
+  price    Float    @default(12.50)
 
-  user         User      @relation(fields: [userId], references: [id])
-  showing      Showing   @relation(fields: [showingId], references: [id])
+  movie    Movie    @relation(fields: [movieId], references: [id])
+  seats    Seat[]
+  bookings Booking[]
 
-  seats        Seat[]
+  @@map("screenings")
 }
 
 model Seat {
-  id          Int      @id @default(autoincrement())
+  id          String      @id @default(uuid())
+  screeningId String
+  row         String      // "A", "B" ...
+  number      Int         // 1, 2, 3 ...
+  label       Int
+  status      SeatStatus  @default(AVAILABLE)
+  lockedBy    String?     // socket id — cleared on expiry or confirm
+  lockExpiresAt DateTime?
 
-  bookingId   Int
-  row         String
-  number      Int
+  screening   Screening   @relation(fields: [screeningId], references: [id])
+  booking     Booking?    @relation(fields: [bookingId], references: [id])
+  bookingId   String?
 
-  booking     Booking  @relation(fields: [bookingId], references: [id])
+  @@unique([screeningId, row, number])
+  @@map("seats")
+}
+
+enum SeatStatus {
+  AVAILABLE
+  LOCKED
+  CONFIRMED
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  userId      Int
+  screeningId String
+  totalPrice  Float
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  screening Screening @relation(fields: [screeningId], references: [id])
+  seats     Seat[]
+
+  @@map("bookings")
 }

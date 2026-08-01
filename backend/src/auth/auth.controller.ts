@@ -11,20 +11,20 @@ export class AuthController {
   async register(
     @Body() dto: registerDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<string> {
+  ): Promise<{ accessToken: string }> {
     const tokens = await this.authservice.register(dto);
     this.authservice.sendTokenViaCookie(res, tokens.refreshToken);
-    return tokens.accessToken;
+    return { accessToken: tokens.accessToken };
   }
 
   @Post('login')
   async logIn(
     @Body() dto: loginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<string> {
+  ): Promise<{ accessToken: string }> {
     const tokens = await this.authservice.logInlogic(dto);
     this.authservice.sendTokenViaCookie(res, tokens.refreshToken);
-    return tokens.accessToken;
+    return { accessToken: tokens.accessToken };
   }
 
   @Post('refresh')
