@@ -1,22 +1,55 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import client from '../api/client';
 
 const TICKET_PRICE = 12.5;
 
-const getNextSixDays = () =>
+export type SeatStatus = "AVAILABLE" | "LOCKED" | "CONFIRMED";
+
+export type SeatModel = {
+  id: string;
+  row: string;
+  number: number;
+  status: SeatStatus;
+};
+
+export type MovieModel = {
+  id: number;
+  title: string;
+  poster: string | null;
+  rating: number;
+  duration: number;
+};
+
+// `label` is what the user sees; `iso` is what the API resolves to a screening.
+export type DayOption = { label: string; iso: string };
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+const getNextSixDays = (): DayOption[] =>
   Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() + i + 1);
-    return `${new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date)} ${date.getDate()}`;
+    return {
+      label: `${new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date)} ${date.getDate()}`,
+      iso: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    };
   });
 
 const TIMES = ["10:00", "12:30", "15:15", "18:00", "20:45", "23:10"];
 
 // ─── Seat ────────────────────────────────────────────────────────────────────
 
-function Seat({ seat, isSelected, onToggle }) {
+function Seat({
+  seat,
+  isSelected,
+  onToggle,
+}: {
+  seat: SeatModel;
+  isSelected: boolean;
+  onToggle: (seat: SeatModel) => void;
+}) {
   const base = "w-7 h-7 rounded-sm text-[10px] font-semibold flex items-center justify-center transition-colors border";
 
   const style =
@@ -42,7 +75,15 @@ function Seat({ seat, isSelected, onToggle }) {
 
 // ─── Seat Map ─────────────────────────────────────────────────────────────────
 
-function SeatMap({ seatMap, selectedSeats, onToggle }) {
+function SeatMap({
+  seatMap,
+  selectedSeats,
+  onToggle,
+}: {
+  seatMap: SeatModel[][];
+  selectedSeats: string[];
+  onToggle: (seat: SeatModel) => void;
+}) {
   if (!seatMap || seatMap.length === 0)
     return <p className="text-cinema-muted text-sm text-center py-10">Select a date and time to see available seats.</p>;
 
@@ -86,7 +127,21 @@ function SeatMap({ seatMap, selectedSeats, onToggle }) {
 
 // ─── Order Summary ────────────────────────────────────────────────────────────
 
-function OrderSummary({ movie, movieLoading, selectedDate, selectedTime, selectedSeats, onConfirm }) {
+function OrderSummary({
+  movie,
+  movieLoading,
+  selectedDate,
+  selectedTime,
+  selectedSeats,
+  onConfirm,
+}: {
+  movie: MovieModel | null;
+  movieLoading: boolean;
+  selectedDate: DayOption | null;
+  selectedTime: string | null;
+  selectedSeats: string[];
+  onConfirm: () => void;
+}) {
   const total      = selectedSeats.length * TICKET_PRICE;
   const hours      = movie?.duration ? Math.floor(movie.duration / 60) : null;
   const minutes    = movie?.duration ? movie.duration % 60 : null;
@@ -121,7 +176,11 @@ function OrderSummary({ movie, movieLoading, selectedDate, selectedTime, selecte
 
       {/* Details */}
       <div className="space-y-2 text-sm">
-        {[["Date", selectedDate], ["Time", selectedTime], ["Seats", selectedSeats.length > 0 ? selectedSeats.join(", ") : null]].map(([label, value]) => (
+        {([
+          ["Date", selectedDate?.label ?? null],
+          ["Time", selectedTime],
+          ["Seats", selectedSeats.length > 0 ? selectedSeats.join(", ") : null],
+        ] as const).map(([label, value]) => (
           <div key={label} className="flex justify-between">
             <span className="text-cinema-muted">{label}</span>
             <span className="text-cinema-cream text-right max-w-[60%] truncate">{value ?? "—"}</span>
@@ -168,13 +227,14 @@ export default function Booking() {
   const { id }   = useParams();
   const navigate = useNavigate();
 
-  const [movie,          setMovie]          = useState(null);
+  const [movie,          setMovie]          = useState<MovieModel | null>(null);
   const [movieLoading,   setMovieLoading]   = useState(true);
-  const [selectedDate,   setSelectedDate]   = useState(null);
-  const [selectedTime,   setSelectedTime]   = useState(null);
-  const [selectedSeats,  setSelectedSeats]  = useState([]);
-  const [seatMap,        setSeatMap]        = useState([]);
-  const [socket,         setSocket]         = useState(null);
+  const [selectedDate,   setSelectedDate]   = useState<DayOption | null>(null);
+  const [selectedTime,   setSelectedTime]   = useState<string | null>(null);
+  const [selectedSeats,  setSelectedSeats]  = useState<string[]>([]);
+  const [seatMap,        setSeatMap]        = useState<SeatModel[][]>([]);
+  const [socket,         setSocket]         = useState<Socket | null>(null);
+  const [screeningId,    setScreeningId]    = useState<string | null>(null);
 
   // ── Fetch movie ──
   useEffect(() => {
@@ -184,24 +244,41 @@ export default function Booking() {
       .finally(() => setMovieLoading(false));
   }, [id]);
 
-  // ── WebSocket — connect when date + time are selected ──
+  // ── Resolve the chosen date + time to a screening ──
+  // The socket room is keyed by screening id, not by movie id.
   useEffect(() => {
     if (!selectedDate || !selectedTime) return;
 
-    // Disconnect previous socket if the user changes date/time
     setSelectedSeats([]);
     setSeatMap([]);
+    setScreeningId(null);
 
-    const ws = io(import.meta.env.VITE_API_URL);
+    let cancelled = false;
+    const startsAt = new Date(`${selectedDate.iso}T${selectedTime}:00`).toISOString();
 
-    // Join the screening room — gateway responds with seats:init
-    ws.on("connect", () => ws.emit("join-room", id));
+    client
+      .get('/bookings/screening', { params: { movieId: id, startsAt } })
+      .then(({ data }) => { if (!cancelled) setScreeningId(data.id); })
+      .catch(console.error);
+
+    return () => { cancelled = true; };
+  }, [id, selectedDate, selectedTime]);
+
+  // ── WebSocket — connect once the screening is known ──
+  useEffect(() => {
+    if (!screeningId) return;
+
+    const ws = io(import.meta.env.VITE_BACKEND_URL);
+
+    // Join the screening room — gateway responds with seats:init.
+    // Re-emitted on every connect so a reconnect rejoins the room.
+    ws.on("connect", () => ws.emit("join-room", screeningId));
 
     // Server sends the full seat map after joining the room
-    ws.on("seats:init", (seats) => setSeatMap(seats));
+    ws.on("seats:init", (seats: SeatModel[][]) => setSeatMap(seats));
 
     // Server broadcasts any seat status change to everyone in the room
-    ws.on("seat:updated", ({ seatId, status }) => {
+    ws.on("seat:updated", ({ seatId, status }: { seatId: string; status: SeatStatus }) => {
       setSeatMap((prev) =>
         prev.map((row) =>
           row.map((seat) => seat.id === seatId ? { ...seat, status } : seat)
@@ -210,32 +287,48 @@ export default function Booking() {
     });
 
     // Server rejects a lock (seat was taken by someone else between click and emit)
-    ws.on("seat:lock-failed", ({ seatId }) => {
+    ws.on("seat:lock-failed", ({ seatId }: { seatId: string }) => {
       setSelectedSeats((prev) => prev.filter((s) => s !== seatId));
     });
 
     setSocket(ws);
-    return () => ws.disconnect();
-  }, [id, selectedDate, selectedTime]);
+
+    return () => {
+      ws.disconnect();
+      setSocket(null);
+    };
+  }, [screeningId]);
 
   // ── Toggle seat — emit lock/unlock via WebSocket ──
-  function handleToggleSeat(seat) {
-    if (!socket) return;
+  function handleToggleSeat(seat: SeatModel) {
+    if (!socket || !screeningId) return;
 
     const isSelected = selectedSeats.includes(seat.id);
 
     if (isSelected) {
-      socket.emit("seat:unlock", { seatId: seat.id, screeningId: id });
+      socket.emit("seat:unlock", { seatId: seat.id, screeningId });
       setSelectedSeats((prev) => prev.filter((s) => s !== seat.id));
     } else {
-      socket.emit("seat:lock", { seatId: seat.id, screeningId: id });
+      socket.emit("seat:lock", { seatId: seat.id, screeningId });
       setSelectedSeats((prev) => [...prev, seat.id]);
     }
   }
 
+  // Seat ids are uuids — show "A1" style labels in the summary instead.
+  const selectedSeatLabels = seatMap
+    .flat()
+    .filter((seat) => selectedSeats.includes(seat.id))
+    .map((seat) => `${seat.row}${seat.number}`);
+
   // ── Confirm booking ──
   function handleConfirm() {
-    client.post('/bookings', { movieId: id, date: selectedDate, time: selectedTime, seats: selectedSeats })
+    if (!screeningId) return;
+
+    client.post('/bookings', {
+      screeningId,
+      seats: selectedSeats,
+      socketId: socket?.id,
+    })
       .then(({ data }) => navigate(`/confirmation/${data.id}`))
       .catch(console.error);
   }
@@ -264,14 +357,14 @@ export default function Booking() {
             <p className="text-xs uppercase tracking-widest text-cinema-muted mb-3">Select date</p>
             <div className="flex gap-2 flex-wrap">
               {getNextSixDays().map((date) => (
-                <button key={date} onClick={() => setSelectedDate(date)}
+                <button key={date.iso} onClick={() => setSelectedDate(date)}
                   className={`px-4 py-2 rounded-lg text-sm border transition-colors ${
-                    selectedDate === date
+                    selectedDate?.iso === date.iso
                       ? "bg-cinema-orange text-cinema-bg border-cinema-orange marquee tracking-wide"
                       : "border-cinema-line text-cinema-muted hover:border-cinema-orange hover:text-cinema-orange"
                   }`}
                 >
-                  {date}
+                  {date.label}
                 </button>
               ))}
             </div>
@@ -312,7 +405,7 @@ export default function Booking() {
             movieLoading={movieLoading}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
-            selectedSeats={selectedSeats}
+            selectedSeats={selectedSeatLabels}
             onConfirm={handleConfirm}
           />
         </div>

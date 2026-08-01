@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import  client  from '../api/client';
 
-function Login({setChangeForm})
+function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
 {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const HandleSubmit = async (e) => {
+  const HandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       setLoading(true);

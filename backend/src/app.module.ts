@@ -18,7 +18,6 @@ import { BookingModule } from './booking/booking.module';
       isGlobal: true,
       envFilePath: '.env', // Default, but explicit is clearer
     }),
-    BookingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

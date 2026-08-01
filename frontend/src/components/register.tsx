@@ -2,7 +2,7 @@ import { useState } from "react";
 import client from '../api/client'
 import { useNavigate } from "react-router-dom";
 
-function Register({setChangeForm})
+function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
 {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -12,7 +12,7 @@ function Register({setChangeForm})
   const [loading, setLoading] = useState(false);
 
 
-  const HandleSubmit = async (e) => {
+  const HandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       setLoading(true);
@@ -110,7 +110,7 @@ function Register({setChangeForm})
               type="submit"
               className="w-full marquee text-xl tracking-wide py-3 rounded-lg transition-colors bg-cinema-orange text-white hover:bg-cinema-orange-bright"
             >
-              REGISTER
+              {loading ? "Loading ..." : "REGISTER"}
             </button>
 
            <div className="p-2">

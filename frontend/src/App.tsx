@@ -4,9 +4,6 @@ import Home from "./pages/homePage";
 import Booking from "./pages/reservationPage";
 import ConfirmationPage from "./pages/confirmationPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { socket } from './socket'
-
-socket.emit('join-room', "showing-123");
 
 function App() {
 

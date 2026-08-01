@@ -28,10 +28,13 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Req() req: Request, @Res() res: Response): Promise<string> {
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ accessToken: string }> {
     const tokens = await this.authservice.refresh(req);
     this.authservice.sendTokenViaCookie(res, tokens.refreshToken);
-    return tokens.accessToken;
+    return { accessToken: tokens.accessToken };
   }
 
   @Post('logout')

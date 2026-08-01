@@ -1,16 +1,23 @@
-import { IsString, IsArray, IsDateString } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateBookingDto {
-  @IsString()
-  movieId: number;
-
-  @IsDateString()
-  date: string; // "Wed 25" — parse to full date in service
-
-  @IsString()
-  time: string; // "20:45"
+  @IsUUID()
+  screeningId: string;
 
   @IsArray()
+  @ArrayNotEmpty()
   @IsString({ each: true })
   seats: string[]; // seat ids: ["seat-uuid-1", "seat-uuid-2"]
+
+  // Socket that holds the locks on these seats, so the confirm can tell the
+  // caller's own locks apart from someone else's.
+  @IsOptional()
+  @IsString()
+  socketId?: string;
 }

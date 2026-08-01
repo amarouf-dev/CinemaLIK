@@ -11,7 +11,7 @@ interface TmdbMovie {
   rating: number;
 }
 
-function StarRating({ rating }) {
+function StarRating({ rating }: { rating: number }) {
   const pct = Math.round((rating / 10) * 100);
   return (
     <div className="flex items-center gap-1.5">
@@ -26,7 +26,7 @@ function StarRating({ rating }) {
   );
 }
 
-function MovieCard({ movie }) {
+function MovieCard({ movie }: { movie: TmdbMovie }) {
   const navigate = useNavigate();
   return (
     <div className="group cursor-pointer">

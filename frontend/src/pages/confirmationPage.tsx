@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
 type BookingDetails = {
-  id: number;
-  showingId: number;
-  seats?: Array<{ row: string; number: number }>;
+  id: string;
+  totalPrice: number;
+  createdAt: string;
+  movie: { title: string; poster: string | null };
+  screening: { startsAt: string; price: number };
+  seats: string[];
 };
 
 export default function ConfirmationPage() {
@@ -35,8 +38,10 @@ export default function ConfirmationPage() {
         {booking && (
           <div className="rounded-lg border border-cinema-line bg-cinema-bg/70 p-4 text-sm text-left space-y-2">
             <p><span className="text-cinema-muted">Booking ID:</span> <span className="text-cinema-cream">{booking.id}</span></p>
-            <p><span className="text-cinema-muted">Showing ID:</span> <span className="text-cinema-cream">{booking.showingId}</span></p>
-            <p><span className="text-cinema-muted">Seats:</span> <span className="text-cinema-cream">{booking.seats?.map((seat: { row: string; number: number }) => `${seat.row}-${seat.number}`).join(', ')}</span></p>
+            <p><span className="text-cinema-muted">Film:</span> <span className="text-cinema-cream">{booking.movie.title}</span></p>
+            <p><span className="text-cinema-muted">Showtime:</span> <span className="text-cinema-cream">{new Date(booking.screening.startsAt).toLocaleString()}</span></p>
+            <p><span className="text-cinema-muted">Seats:</span> <span className="text-cinema-cream">{booking.seats.join(', ')}</span></p>
+            <p><span className="text-cinema-muted">Total:</span> <span className="text-cinema-cream">${booking.totalPrice.toFixed(2)}</span></p>
           </div>
         )}
         <button
