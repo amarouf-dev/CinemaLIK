@@ -38,10 +38,15 @@ export default function ConfirmationPage() {
         {booking && (
           <div className="rounded-lg border border-cinema-line bg-cinema-bg/70 p-4 text-sm text-left space-y-2">
             <p><span className="text-cinema-muted">Booking ID:</span> <span className="text-cinema-cream">{booking.id}</span></p>
+<<<<<<< HEAD
             <p><span className="text-cinema-muted">Film:</span> <span className="text-cinema-cream">{booking.movie.title}</span></p>
             <p><span className="text-cinema-muted">Showtime:</span> <span className="text-cinema-cream">{new Date(booking.screening.startsAt).toLocaleString()}</span></p>
             <p><span className="text-cinema-muted">Seats:</span> <span className="text-cinema-cream">{booking.seats.join(', ')}</span></p>
             <p><span className="text-cinema-muted">Total:</span> <span className="text-cinema-cream">${booking.totalPrice.toFixed(2)}</span></p>
+=======
+            <p><span className="text-cinema-muted">Showing ID:</span> <span className="text-cinema-cream">{booking.showingId}</span></p>
+            <p><span className="text-cinema-muted">Seats:</span> <span className="text-cinema-cream">{booking.seats?.map((seat: { row: string; number: number }) => `${seat.row}-${seat.number}`).join(', ')}</span></p>
+>>>>>>> 4d2164a (GG)
           </div>
         )}
         <button

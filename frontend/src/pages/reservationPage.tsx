@@ -234,7 +234,7 @@ export default function Booking() {
   const [selectedSeats,  setSelectedSeats]  = useState<string[]>([]);
   const [seatMap,        setSeatMap]        = useState<SeatModel[][]>([]);
   const [socket,         setSocket]         = useState<Socket | null>(null);
-  const [screeningId,    setScreeningId]    = useState<string | null>(null);
+  const [screeningId,    setScreeningId]    = useState<string | null>(null); (GG)
 
   // ── Fetch movie ──
   useEffect(() => {
