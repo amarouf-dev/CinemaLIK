@@ -1,6 +1,7 @@
 import { useState } from "react";
 import client from '../api/client'
 import { useNavigate } from "react-router-dom";
+import type { AxiosError } from 'axios';
 
 function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
 {
@@ -10,10 +11,18 @@ function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
   const [name, setName] = useState('');
   const navigate = useNavigate();  
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
 
   const HandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError('');
+
+    if (password !== confpassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await client.post('/auth/register', {
@@ -24,8 +33,10 @@ function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
       const accessToken = res.data.accessToken;
       localStorage.setItem('accessToken', accessToken);
       navigate('/home');
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      const message = axiosError.response?.data?.message || 'Registration failed. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -33,6 +44,11 @@ function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
 
     return (
          <form className="px-7 sm:px-9 pb-3 pt-6 space-y-4" onSubmit={HandleSubmit}>
+            {error && (
+              <div className="rounded-lg px-4 py-3 text-sm text-red-400 bg-red-400/10 border border-red-400/30">
+                {error}
+              </div>
+            )}
             <div>
               <label htmlFor="register-name" className="block text-xs uppercase tracking-widest mb-1.5 text-cinema-muted">
                 Full name<span className="text-cinema-orange">*</span>
@@ -108,7 +124,8 @@ function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
 
             <button
               type="submit"
-              className="w-full marquee text-xl tracking-wide py-3 rounded-lg transition-colors bg-cinema-orange text-white hover:bg-cinema-orange-bright"
+              disabled={loading}
+              className="w-full marquee text-xl tracking-wide py-3 rounded-lg transition-colors bg-cinema-orange text-white hover:bg-cinema-orange-bright disabled:opacity-60"
             >
               {loading ? "Loading ..." : "REGISTER"}
             </button>
@@ -116,7 +133,7 @@ function Register({setChangeForm}: {setChangeForm: (value: boolean) => void})
            <div className="p-2">
                 <p className="text-center text-xs pt-1 text-cinema-muted">
                     Already have an account?{" "}
-                    <a onClick={() => setChangeForm(false)} className="hover:opacity-80 text-cinema-orange">
+                    <a onClick={() => setChangeForm(false)} className="hover:opacity-80 text-cinema-orange cursor-pointer">
                         Log in
                     </a>
                 </p>

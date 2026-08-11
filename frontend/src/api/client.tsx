@@ -34,9 +34,9 @@ client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config;
-    const isRefreshRequest = originalRequest?.url?.includes('/auth/refresh');
+    const isAuthRequest = originalRequest?.url?.startsWith('/auth/');
 
-    if (error.response?.status === 401 && !isRefreshRequest && !originalRequest?._retry) {
+    if (error.response?.status === 401 && !isAuthRequest && !originalRequest?._retry) {
       if (isRefreshing) {
         return new Promise((resolve) => {
           subscribeTokenRefresh((token) => {

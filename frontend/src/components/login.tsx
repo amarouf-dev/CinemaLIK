@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import  client  from '../api/client';
+import type { AxiosError } from 'axios';
 
 function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
 {
@@ -8,9 +9,11 @@ function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const HandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError('');
     try {
       setLoading(true);
       const res = await client.post('/auth/login', {
@@ -20,8 +23,10 @@ function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
       const accessToken = res.data.accessToken;
       localStorage.setItem('accessToken', accessToken);
       navigate('/home');
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      const message = axiosError.response?.data?.message || 'Login failed. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -29,9 +34,14 @@ function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
 
     return (
          <form className="px-7 sm:px-9 pb-3 pt-8 space-y-5" onSubmit={HandleSubmit}>
+            {error && (
+              <div className="rounded-lg px-4 py-3 text-sm text-red-400 bg-red-400/10 border border-red-400/30">
+                {error}
+              </div>
+            )}
             <div>
               <label htmlFor="login-email" className="block text-xs uppercase tracking-widest mb-2 text-cinema-muted">
-                Emails<span className="text-cinema-orange">*</span>
+                Email<span className="text-cinema-orange">*</span>
               </label>
               <input
                 id="login-email"
@@ -80,7 +90,8 @@ function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
             
             <button
               type="submit"
-              className="w-full marquee text-xl tracking-wide py-3.5 rounded-lg transition-colors bg-cinema-orange text-white hover:bg-cinema-orange-bright"
+              disabled={loading}
+              className="w-full marquee text-xl tracking-wide py-3.5 rounded-lg transition-colors bg-cinema-orange text-white hover:bg-cinema-orange-bright disabled:opacity-60"
             >
               {loading ? "Loading ..." : "LOGIN"}
             </button>
@@ -88,7 +99,7 @@ function Login({setChangeForm}: {setChangeForm: (value: boolean) => void})
             <div className="p-4">
                 <p className="text-center text-xs pt-1 text-cinema-muted">
                     You don't have an account?{" "}
-                    <a onClick={() => setChangeForm(true)} className="hover:opacity-80 text-cinema-orange">
+                    <a onClick={() => setChangeForm(true)} className="hover:opacity-80 text-cinema-orange cursor-pointer">
                         register
                     </a>
                 </p>
