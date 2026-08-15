@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import movieCollage from "../assets/movie-collage.jpeg";
 import client from '../api/client'
 import { useNavigate } from "react-router-dom";
+import { useCallback } from 'react';
 
 interface TmdbMovie {
   id: number;
@@ -88,6 +89,18 @@ export default function Home() {
     fetchMovies();
   }, [Page])
 
+  const navigate = useNavigate();
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await client.post('/auth/logout');
+      localStorage.removeItem('accessToken');
+      navigate('/auth');
+    } catch (err) {
+      console.error('logout failed', err);
+    }
+  }, [navigate]);
+
   return (
     <main className="min-h-screen bg-cinema-bg card-body">
 
@@ -111,6 +124,13 @@ export default function Home() {
           <p className="text-cinema-muted text-sm sm:text-base max-w-md mx-auto mb-7">
             Book your seat for tonight's show.
           </p>
+          <div className="mt-4">
+            <button
+              onClick={handleLogout}
+              className="text-sm uppercase tracking-widest bg-transparent border border-cinema-cream text-cinema-cream px-4 py-2 rounded-md hover:bg-cinema-cream/10">
+              Logout
+            </button>
+          </div>
           {/* <button className="marquee text-xl tracking-wide bg-cinema-orange text-cinema-bg px-8 py-3 rounded-lg hover:bg-cinema-orange-bright transition-colors">
             SEE WHAT'S PLAYING
           </button> */}

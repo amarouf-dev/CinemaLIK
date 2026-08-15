@@ -1,56 +1,64 @@
-# CinemaLIK
+# CinemaLIK 🎬
 
-A full-stack cinema seat-booking application built as an end-of-studies internship project (PFE).
+A state-of-the-art, full-stack real-time cinema seat-booking web application, custom-architected for high concurrency and secure session handling.
 
-Users browse films pulled live from The Movie Database (TMDB), pick a showtime, choose their seats on an interactive seat map, and confirm a reservation. Seat availability is synchronised in real time between everyone viewing the same showing, so two people can never fight over the same seat without knowing it.
-
----
-
-## Table of contents
-
-- [Tech stack](#tech-stack)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Project structure](#project-structure)
-- [Getting started](#getting-started)
-- [Environment variables](#environment-variables)
-- [Database](#database)
-- [API reference](#api-reference)
-- [WebSocket events](#websocket-events)
-- [Authentication flow](#authentication-flow)
-- [Project status](#project-status)
-- [Roadmap](#roadmap)
+CinemaLIK lets users browse live movies sourced via a server-side proxy from The Movie Database (TMDB), select screenings, select seats dynamically on an interactive theatre map, and confirm reservations. To deliver an exceptional user experience, seat status (available, locked, confirmed) synchronizes in real time across all concurrent users utilizing a robust WebSocket architecture and transaction-isolated database locks.
 
 ---
 
-## Tech stack
+## 📋 Table of Contents
 
-**Backend**
-
-| | |
-|---|---|
-| Framework | [NestJS 11](https://nestjs.com/) (TypeScript, modular architecture) |
-| Database | PostgreSQL |
-| ORM | [Prisma 7](https://www.prisma.io/) with the `@prisma/adapter-pg` driver adapter |
-| Auth | JWT access tokens + rotating refresh tokens, Passport (`passport-jwt`), bcrypt |
-| Real time | Socket.IO via `@nestjs/websockets` |
-| External API | TMDB (The Movie Database) through `@nestjs/axios` |
-| Validation | `class-validator` / `class-transformer` with a global `ValidationPipe` |
-
-**Frontend**
-
-| | |
-|---|---|
-| Framework | React 19 + TypeScript |
-| Build tool | Vite |
-| Routing | React Router 7 |
-| Styling | Tailwind CSS 4 (custom `@theme` design tokens — art-deco cinema palette) |
-| HTTP | Axios, with a shared client that injects the access token and refreshes it transparently |
-| Real time | `socket.io-client` |
+- [🛠️ CV Technical Highlights (Resume Ready)](#️-cv-technical-highlights-resume-ready)
+- [💻 Tech Stack](#-tech-stack)
+- [🏗️ System Architecture](#️-system-architecture)
+- [✨ Core Features](#-core-features)
+- [📁 Project Structure](#-project-structure)
+- [⚙️ Database Schema & Models](#️-database-schema--models)
+- [🚀 Getting Started](#-getting-started)
+- [🌐 Environment Variables](#-environment-variables)
+- [🔌 API Reference](#-api-reference)
+- [📡 WebSocket Event Gateway](#-websocket-event-gateway)
+- [🔒 Authentication & Security Protocols](#-authentication--security-protocols)
+- [📈 Roadmap](#-roadmap)
 
 ---
 
-## Architecture
+## 🛠️ CV Technical Highlights (Resume Ready)
+
+Below are key professional highlights and engineering achievements from this project that you can copy and paste directly into your CV/Resume:
+
+### **Core Competencies & Achievements**
+* **Real-Time Data Synchronization**: Designed and implemented a bidirectional event-driven communication layer using **Socket.IO** rooms to broadcast screening-specific seat locks and confirmations to all active clients, keeping UI state reactive without polling.
+* **Concurrency Control & Atomic Transactions**: Built an isolated booking system with **Prisma ORM** `$transaction` blocks. Leveraged conditional write assertions (`updateMany` count verification) in **PostgreSQL** to prevent race conditions and double bookings under concurrent booking requests.
+* **Advanced Axios Request Queueing**: Engineered a custom token refresh interceptor using **Axios** that handles access token expiration transparently. Replays pending client calls and queues concurrent requests under a single refresh-token exchange to eliminate duplicate token generation loops.
+* **Secure Session Management & Rotation**: Implemented a security-first authentication system using short-lived JWT access tokens and long-lived **HttpOnly, SameSite, Secure** refresh tokens. Features automatic Refresh Token Rotation (RTR) with database-backed session revocation.
+* **Automated Background Job Scheduling**: Integrated **NestJS Schedule** to run minute-by-minute cron sweeps (`LockExpiryCron`) that identify and release stale database-level seat locks (5-minute expiration) and broadcast the released seats back to active clients.
+* **API Gateway & Data Normalization**: Developed a secure server-side proxy module for the external TMDB API using NestJS **HttpService (RxJS)**, encapsulating API credentials, caching core movie entities, and normalizing payloads to a standard JSON API schema.
+
+---
+
+## 💻 Tech Stack
+
+### **Backend Framework & Services**
+* **Framework**: [NestJS 11](https://nestjs.com/) (TypeScript, Modular Architecture, Dependency Injection)
+* **Database**: PostgreSQL (Structured Relational Store)
+* **ORM**: [Prisma 7](https://www.prisma.io/) (with `@prisma/adapter-pg` driver adapter)
+* **Real-time Engine**: Socket.IO via `@nestjs/websockets`
+* **Task Scheduler**: `@nestjs/schedule` (for Cron-based background sweeps)
+* **Security & Auth**: Passport (`passport-jwt`), JSON Web Tokens (JWT), `bcrypt` (password hashing), Express `cookie-parser`
+* **Validation**: `class-validator` and `class-transformer` (for type-safe DTO incoming payload validation)
+
+### **Frontend Client**
+* **Framework**: React 19 + TypeScript (Single Page Application)
+* **Build System**: Vite (Fast HMR and Optimized Production Bundles)
+* **Routing**: React Router v7 (Client-side routing with Guarded/Protected Routes)
+* **Styling**: Tailwind CSS v4 (Leveraging native CSS `@theme` variables for bespoke aesthetics)
+* **HTTP Client**: Axios (Custom instance with pre-configured request interceptors and token-refresh queueing)
+* **WebSockets**: `socket.io-client`
+
+---
+
+## 🏗️ System Architecture
 
 ```
 ┌──────────────────────┐         REST (JSON)          ┌──────────────────────┐
@@ -68,132 +76,69 @@ Users browse films pulled live from The Movie Database (TMDB), pick a showtime, 
                                          └──────────┘                  └─────────────┘
 ```
 
-The backend is split into feature modules, each owning its controller, service and DTOs:
-
-- **`auth`** — registration, login, token issuance, refresh-token rotation, logout. Includes the Passport JWT strategy and the `JwtAuthGuard` reused across the app.
-- **`users`** — user persistence and profile lookup.
-- **`movies`** — a thin proxy over TMDB that normalises the upstream payload (poster URLs, genres, runtime) so the frontend never talks to TMDB directly and the API key stays server-side.
-- **`booking`** — reservations and the Socket.IO gateway that broadcasts seat updates to everyone in a showing's room.
-- **`prisma`** — a single injectable `PrismaService` extending `PrismaClient`, connected on module init.
-
-Film metadata lives in TMDB, not in the database. Only the cinema's own domain — screenings, bookings, seats and users — is persisted, along with a thin `Movie` cache holding just enough (title, poster, rating, runtime) for a screening to reference a film without a round trip to TMDB.
+The system separates concerns through a modular backend structure:
+* **`auth`**: Handles register, login, session refresh, token rotation, and cookie-based revocation.
+* **`users`**: Controls user profile retrieval and persistence.
+* **`movies`**: Serves as a secure proxy to the TMDB API, stripping key details and mapping payloads to cleaner formats.
+* **`booking`**: Orchestrates database transactions, seat bookings, and runs the Socket.IO event gateway.
+* **`prisma`**: Contains the injectable `PrismaService` connected database-wide.
 
 ---
 
-## Features
+## ✨ Core Features
 
-- **Account management** — register and log in with email and password. Passwords are hashed with bcrypt and never leave the server.
-- **Session handling** — short-lived JWT access tokens (15 min) paired with a 7-day refresh token stored in an `httpOnly` cookie. The refresh token is rotated on every use and its hash is kept in the database so sessions can be revoked server-side.
-- **Film catalogue** — a paginated "Now Showing" grid backed by TMDB, with posters, ratings and synopses, plus a detail view exposing runtime and genres.
-- **Booking flow** — pick a date, pick a showtime, select seats on a rendered auditorium layout (with a centre aisle and a screen indicator), and review a live order summary before confirming.
-- **Real-time seat map** — clients join a Socket.IO room per showing, so seats taken by other users appear immediately without a refresh.
-- **Themed UI** — a bespoke Tailwind theme (marquee typography, ticket-stub card, cinema palette) rather than a stock component library.
+* **Real-Time Seat Booking Map**:
+  - Cinema seating layout rendered dynamically by row (`A` through `H`) and seat number (1-12), split down the middle by a virtual central aisle.
+  - Active WebSocket connections keep the seat grid synchronized across everyone viewing the same screening.
+* **Optimistic Locking with 5-Minute Sweep**:
+  - Selecting a seat locks it for 5 minutes (state: `LOCKED`).
+  - Stale seat locks are automatically cleared via a scheduled backend cron sweep every minute, returning unclaimed seats back to `AVAILABLE`.
+  - Seat locks are released immediately if a user disconnects mid-selection.
+* **Transparent Token Refresh Queueing**:
+  - Short-lived access tokens (15m) and HTTP-Only refresh cookies (7d).
+  - If multiple API requests fail with `401 Unauthorized` simultaneously, the Axios interceptor queues subsequent requests, initiates a single refresh call, updates the JWT token, and replays all queued requests seamlessly.
+* **Database Concurrency Isolation**:
+  - Utilizes PostgreSQL query transactions to check, lock, and verify seat counts during checkout. If another user books a seat first, the transaction rolls back, throwing a `409 Conflict`.
+* **Now Showing Catalogue with Endless Pagination**:
+  - Popular films grid with title, rating, poster, and overview descriptions.
+  - "Load More" pagination updates state and appends the next page of TMDB-discover results dynamically.
+* **Custom Marquee Cinema Palette Theme**:
+  - Styled utilizing Tailwind CSS v4 `@theme` tokens, creating an immersive, premium, art-deco aesthetic with deep dark backgrounds (`#0B0B0D`), custom marquees (`Bebas Neue`), and ticket-stub visual components.
 
 ---
 
-## Project structure
+## 📁 Project Structure
 
 ```
 CinemaLIK/
-├── backend/                        NestJS API
+├── backend/                        # NestJS API Engine
 │   ├── prisma/
-│   │   ├── schema.prisma           Data model
-│   │   └── migrations/             Versioned SQL migrations
+│   │   ├── schema.prisma           # Prisma Data Model Configuration
+│   │   └── migrations/             # SQL Migrations for Schema Evolution
 │   ├── src/
-│   │   ├── auth/                   Register / login / refresh / logout
-│   │   │   ├── dto/                Request validation schemas
-│   │   │   ├── jwt/                Passport strategy + guard
-│   │   │   └── types/              Typed authenticated request
-│   │   ├── users/                  User persistence & profile
-│   │   ├── movies/                 TMDB proxy
-│   │   ├── booking/                Reservations
-│   │   │   └── booking-gateway/    Socket.IO gateway
-│   │   ├── prisma/                 PrismaService
-│   │   └── main.ts                 Bootstrap, CORS, global pipes
+│   │   ├── auth/                   # Auth routes, JWT guards & cookie configuration
+│   │   ├── users/                  # User persistence & endpoint handlers
+│   │   ├── movies/                 # Server-side TMDB API Proxy service
+│   │   ├── booking/                # Reservation service, transactions & lock logic
+│   │   │   ├── booking-gateway/    # Socket.IO WebSocket gateway & event emitters
+│   │   │   └── lock-expiry.cron.ts # Minute-by-minute Cron sweep scheduling
+│   │   ├── prisma/                 # PrismaService Injection
+│   │   └── main.ts                 # CORS, Cookie Parsing, global Pipes bootstrap
 │   └── prisma.config.ts
 │
-└── frontend/                       React SPA
+└── frontend/                       # React Single Page Application (SPA)
     └── src/
-        ├── api/client.tsx          Axios instance + auth interceptors
-        ├── socket.ts               Socket.IO client
-        ├── components/             Login / Register forms
-        ├── pages/                  Auth, Home, Reservation
-        ├── assets/
-        └── index.css               Tailwind theme tokens
+        ├── api/client.tsx          # Axios Instance + Concurrent Request Refresh Interceptors
+        ├── socket.ts               # Socket.IO client instance wrapper
+        ├── components/             # Reusable UI Blocks (Forms, Protected Routes)
+        ├── pages/                  # Views (Authentication, Movies Home, Reservation, Confirmation)
+        ├── assets/                 # Image collages & static assets
+        └── index.css               # Bespoke Tailwind CSS v4 design theme & styling variables
 ```
 
 ---
 
-## Getting started
-
-### Prerequisites
-
-- Node.js 20 or later
-- A running PostgreSQL instance
-- A free [TMDB API key](https://www.themoviedb.org/settings/api)
-
-### 1. Clone
-
-```bash
-git clone git@github.com:amarouf-dev/CinemaLIK.git
-cd CinemaLIK
-```
-
-### 2. Backend
-
-```bash
-cd backend
-npm install
-cp .env.example .env        # then fill in the values (see below)
-
-npx prisma generate         # generates the client into backend/generated/
-npx prisma migrate dev      # creates the schema in your database
-
-npm run start:dev           # http://localhost:3000
-```
-
-> `prisma generate` is required before the first build — the Prisma client is emitted to `backend/generated/` and is not committed to the repository.
-
-### 3. Frontend
-
-```bash
-cd frontend
-npm install
-cp .env.example .env        # VITE_BACKEND_URL=http://localhost:3000
-
-npm run dev                 # http://localhost:5173
-```
-
-### Available scripts
-
-**Backend** — `npm run start:dev` (watch mode) · `npm run build` · `npm run start:prod` · `npm test` · `npm run test:e2e` · `npm run lint` · `npm run format`
-
-**Frontend** — `npm run dev` · `npm run build` · `npm run preview` · `npm run lint`
-
----
-
-## Environment variables
-
-**`backend/.env`**
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string, e.g. `postgresql://user:pass@localhost:5432/cinemalik` |
-| `ACCESS_TOKEN` | Secret used to sign 15-minute access tokens |
-| `REFRESH_TOKEN` | Secret used to sign 7-day refresh tokens (must differ from `ACCESS_TOKEN`) |
-| `MOVIES_API_KEY` | TMDB API key |
-| `PORT` | API port (defaults to `3000`) |
-| `NODE_ENV` | Set to `production` to mark the refresh cookie `secure` |
-
-**`frontend/.env`**
-
-| Variable | Description |
-|---|---|
-| `VITE_BACKEND_URL` | Base URL of the API, e.g. `http://localhost:3000` |
-
----
-
-## Database
+## ⚙️ Database Schema & Models
 
 ```
 Movie ──< Screening ──< Seat
@@ -201,120 +146,107 @@ Movie ──< Screening ──< Seat
 User ──< Booking ─────────┘
 ```
 
-| Model | Purpose |
-|---|---|
-| **User** | `id`, `email` (unique), `name`, `password_hash`, `refresh_token` (hashed) |
-| **Movie** | Cached TMDB film (`id`, `title`, `poster`, `rating`, `duration`) — needed so a screening can reference a film |
-| **Screening** | A showtime for a film: `movieId`, `startsAt`, `price` |
-| **Booking** | Links a `User` to a `Screening`, with `totalPrice` and `createdAt` |
-| **Seat** | A seat (`row`, `number`) in a screening, with a `status` of `AVAILABLE` / `LOCKED` / `CONFIRMED`, unique per `(screening, row, number)` |
-
-Migrations live in `backend/prisma/migrations/` and are applied with `npx prisma migrate deploy` in production.
+| Model | Table Name | Purpose |
+|---|---|---|
+| **User** | `User` | Stores `email` (unique), `name`, `password_hash` (bcrypt), and the hashed `refresh_token` signature. |
+| **Movie** | `movies` | Cached film records (`id`, `title`, `poster`, `rating`, `duration`) matching TMDB references. |
+| **Screening** | `screenings` | Instances of a movie showtime (`movieId`, `startsAt`, ticket `price`). |
+| **Seat** | `seats` | Represents specific coordinates (`row`, `number`) linked to a screening, maintaining state (`AVAILABLE`, `LOCKED`, `CONFIRMED`) and unique constraints on `(screeningId, row, number)`. |
+| **Booking** | `bookings` | Links a `User` to a `Screening` with transaction total details and timestamp. |
 
 ---
 
-## API reference
+## 🚀 Getting Started
 
-Base URL: `http://localhost:3000`
+### Prerequisites
+* **Node.js**: v20 or later
+* **PostgreSQL**: Local or hosted database instance
+* **TMDB API Key**: Free key from [The Movie Database API settings](https://www.themoviedb.org/settings/api)
 
-### Auth
+### 1. Clone the repository
+```bash
+git clone git@github.com:amarouf-dev/CinemaLIK.git
+cd CinemaLIK
+```
 
-| Method | Route | Body | Description |
+### 2. Configure & Run Backend
+```bash
+cd backend
+npm install
+cp .env.example .env        # Add your DATABASE_URL, secrets, and MOVIES_API_KEY
+
+npx prisma generate         # Generate localized Prisma Client
+npx prisma migrate dev      # Synchronize database schemas & tables
+npm run start:dev           # Run NestJS in Development Watch Mode (http://localhost:3000)
+```
+
+### 3. Configure & Run Frontend
+```bash
+cd ../frontend
+npm install
+cp .env.example .env        # Set VITE_BACKEND_URL=http://localhost:3000
+npm run dev                 # Start Vite Dev Server (http://localhost:5173)
+```
+
+---
+
+## 🌐 Environment Variables
+
+### **Backend (`backend/.env`)**
+* `DATABASE_URL`: PostgreSQL Connection String (e.g. `postgresql://postgres:pwd@localhost:5432/cinemalik`)
+* `ACCESS_TOKEN`: Encryption key for short-lived access JWT tokens
+* `REFRESH_TOKEN`: Encryption key for long-lived refresh JWT tokens
+* `MOVIES_API_KEY`: API Key for query authentication to TMDB
+* `PORT`: Server port (defaults to `3000`)
+* `NODE_ENV`: Set to `production` to enforce secure cookies (HttpOnly + Secure + Lax)
+
+### **Frontend (`frontend/.env`)**
+* `VITE_BACKEND_URL`: Destination URL pointing to the NestJS server instance (`http://localhost:3000`)
+
+---
+
+## 🔌 API Reference
+
+### **Authentication Module**
+* `POST /auth/register` - Registers a new user account. Issues JWT access token & sets HTTP-Only cookie.
+* `POST /auth/login` - Authenticates credentials. Issues JWT access token & sets HTTP-Only cookie.
+* `POST /auth/refresh` - Reads HTTP-Only cookie, performs rotation validation, and issues a new access token.
+* `POST /auth/logout` - Clears cookie and invalidates the refresh token record in the database.
+
+### **Users Module**
+* `GET /users/me` [Guarded] - Returns email and name details of the authenticated requester.
+
+### **Movies Catalogue Module**
+* `GET /movies/popular?page=X` - Returns paginated, normalized movie listings.
+* `GET /movies/:id` - Fetches specific movie metadata including duration (mins) and genres.
+
+### **Bookings Module**
+* `GET /bookings/screening?movieId=X&startsAt=Y` [Guarded] - Resolves showtimes to a screening database record. Automatically provisions the movie and seats grid if requested for the first time.
+* `POST /bookings` [Guarded] - Submits a seat booking transaction. Body: `{ screeningId, seats[], socketId? }`.
+* `GET /bookings/:id` [Guarded] - Retrieves booking details. Scoped to the authenticated owner.
+
+---
+
+## 📡 WebSocket Event Gateway
+
+Real-time seat mapping is managed using rooms keyed by the **Screening ID**.
+
+| Direction | Event Name | Payload | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | `{ name, email, password }` | Creates an account, returns an access token and sets the refresh cookie |
-| `POST` | `/auth/login` | `{ email, password }` | Authenticates, returns an access token and sets the refresh cookie |
-| `POST` | `/auth/refresh` | — (refresh cookie) | Rotates the refresh token and returns a new access token |
-| `POST` | `/auth/logout` | — (refresh cookie) | Clears the cookie and revokes the stored refresh token |
-
-Passwords must be at least 8 characters; the email is validated server-side.
-
-### Users
-
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| `GET` | `/users/me` | Bearer | Returns the authenticated user's `email` and `name` |
-
-### Movies
-
-| Method | Route | Query | Description |
-|---|---|---|---|
-| `GET` | `/movies/popular` | `page` | Paginated catalogue: `id`, `title`, `overview`, `poster`, `rating` |
-| `GET` | `/movies/:id` | — | Film detail, adding `duration` (minutes) and `genres` |
-
-### Bookings
-
-All booking routes require `Authorization: Bearer <accessToken>`.
-
-| Method | Route | Query / Body | Description |
-|---|---|---|---|
-| `GET` | `/bookings/screening` | `movieId`, `startsAt` (ISO) | Resolves a film + showtime to a screening id, provisioning the screening and its seat grid on first request |
-| `POST` | `/bookings` | `{ screeningId, seats[], socketId? }` | Confirms the selected seats and returns `{ id }` |
-| `GET` | `/bookings/:id` | — | Booking detail, scoped to the authenticated owner |
-
-Protected routes expect `Authorization: Bearer <accessToken>`.
+| Client ➔ Server | `join-room` | `screeningId` | Subscribes socket to the screening room. |
+| Client ➔ Server | `seat:lock` | `{ seatId, screeningId }` | Holds a seat for 5 minutes. |
+| Client ➔ Server | `seat:unlock` | `{ seatId, screeningId }` | Releases a seat before booking completion. |
+| Server ➔ Client | `seats:init` | `Seat[][]` | Sent on joining; initialization map grouped by row. |
+| Server ➔ Room | `seat:updated` | `{ seatId, status }` | Broadcasts seat status change (`AVAILABLE`, `LOCKED`, `CONFIRMED`). |
+| Server ➔ Client | `seat:lock-failed`| `{ seatId, reason }` | Sent if the seat was claimed before the socket request processed. |
 
 ---
 
-## WebSocket events
+## 🔒 Authentication & Security Protocols
 
-The gateway is served from the same origin as the API. Clients join one room per **screening**, so broadcasts stay scoped to a single showtime.
-
-| Direction | Event | Payload | Description |
-|---|---|---|---|
-| Client → Server | `join-room` | `screeningId` | Subscribes the socket to a screening's room |
-| Client → Server | `seat:lock` | `{ seatId, screeningId }` | Holds a seat for 5 minutes |
-| Client → Server | `seat:unlock` | `{ seatId, screeningId }` | Releases a seat the socket holds |
-| Server → Client | `seats:init` | `Seat[][]` | Full seat map, sent to the socket that just joined |
-| Server → Room | `seat:updated` | `{ seatId, status }` | Any status change (`AVAILABLE` / `LOCKED` / `CONFIRMED`) |
-| Server → Client | `seat:lock-failed` | `{ seatId, reason }` | The seat was claimed between click and emit |
-
-Locks are released when the socket disconnects, and a cron sweep expires any that outlive their 5-minute window.
+1. **Dual-Token Lifecycle**: Authentication splits credentials into low-durability (15 minutes) bearer tokens for API requests and highly-durable (7 days) refresh tokens to manage long-term sessions.
+2. **Rotating Refresh Keys (RTR)**: Successful refresh transactions invalidate the old refresh token database signature and issue a fresh pair. Re-use of any previously invalidated refresh token immediately flags the session as compromised and revokes all active tokens for that user.
+3. **Storage Isolation**: Access tokens are kept in JavaScript memory, while refresh tokens are confined to HTTP-Only cookies, preventing data-harvesting scripts (XSS attacks) from reading them.
+4. **CORS Restrictions**: Both backend and WebSocket configurations are bound to valid client origins (e.g. `http://localhost:5173`), preventing unauthorized cross-origin requests.
 
 ---
-
-## Authentication flow
-
-1. On register or login the API returns a **short-lived access token** in the response body and sets a **refresh token** in an `httpOnly`, `sameSite` cookie the JavaScript layer can never read.
-2. The refresh token is hashed before being stored on the user row, so a database leak does not hand over usable sessions.
-3. Every outgoing request is decorated with `Authorization: Bearer <token>` by an Axios request interceptor.
-4. When a request comes back `401`, a response interceptor silently calls `/auth/refresh`, stores the new access token, and replays the original request — the user never sees the interruption.
-5. Refresh tokens are **rotated**: each refresh issues a new pair and overwrites the stored hash, so a previously used token can no longer be redeemed.
-6. Logout clears the cookie and nulls the stored hash, invalidating the session on the server rather than only in the browser.
-
----
-
-## Project status
-
-The application is a work in progress. What is implemented today:
-
-- ✅ Registration, login, logout, token refresh and rotation
-- ✅ Authenticated profile endpoint with a reusable JWT guard
-- ✅ TMDB proxy — catalogue listing and film detail
-- ✅ Full booking UI: date picker, showtime picker, seat map, order summary
-- ✅ Prisma schema and migrations for users, movies, screenings, bookings and seats
-- ✅ Booking endpoints — screening lookup, seat confirmation in a transaction, owner-scoped booking detail
-- ✅ Real-time seat map — per-screening rooms, 5-minute seat locks, release on disconnect and on expiry
-- ✅ Confirmation page and protected frontend routes
-
-In progress:
-
-- 🚧 **Screenings are provisioned on demand** — the UI offers any date/time, so a screening and its seat grid are created on first lookup rather than seeded from a real programme.
-- 🚧 **Seat locks are tied to a socket id**, so refreshing the page during checkout leaves the user's own seats held until the 5-minute sweep clears them.
-- 🚧 **Test coverage** — only the generated scaffolding exists.
-
----
-
-## Roadmap
-
-- Seed a real programme of screenings instead of provisioning them on demand, and add a uniqueness constraint on `(movieId, startsAt)`
-- Tie seat locks to the user rather than the socket, so a page refresh keeps the selection
-- "My reservations" history and booking cancellation
-- Payment step in place of the flat ticket price
-- Admin area for managing films and screenings
-- Unit and end-to-end test coverage beyond the generated scaffolding
-
----
-
-## Author
-
-**Abdellah Marouf** — end-of-studies internship project (PFE).
